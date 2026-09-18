@@ -23,7 +23,10 @@ When playing on a dedicated or remote server, if the server drops your client's 
 - **Two-Stage Detection**:
   - **Stage 1 (Halfway Warning)**: When server silence reaches halfway through the configured timeout period (e.g. 15s at the default 30s timeout), a prominent on-screen center notice warns the player: `"Server connection lost, attempting to reconnect... ({0}s)"`. The `{0}` placeholder dynamically updates with the countdown until disconnect.
   - **Auto-Recovery**: If server communication resumes during the warning stage, the warning is dismissed and an on-screen notice confirms: `"Server connection restored."`
-  - **Stage 2 (Timeout & Clean Logout)**: If silence reaches the full timeout (or the server socket closes), the mod displays `"Server connection lost. Disconnecting..."` and triggers `Game.instance.Logout()`.
+  - **Stage 2 (Timeout & Clean Logout)**: If silence reaches the full timeout, the server socket closes, or the server peer drops, the mod displays `"Server connection lost. Disconnecting..."`, pauses for the configured notice delay (`DisconnectDelaySeconds`, default 5s) so the notice is readable, and triggers `Game.instance.Logout()`.
+- **Severed Peer & badly behaved Mod Protection**: Catches scenarios where a third-party mod (such as `ServerCharacters` inventory sync timeout) or network failure drops the server peer without an engine logout, preventing players from being trapped in desync limbo.
+- **Preserves Native Disconnect Reasons**: If an admin kicks or bans a player, or the server shuts down, the watchdog defers to native Valheim, allowing players to see the genuine error dialog instead of generic watchdog notices.
+- **Portal & Teleport Hang Guard**: Resumes health checks after a configurable ceiling (`TeleportTimeoutSeconds`, default 30s) if a player gets stuck in an indefinite portal desync.
 - **Preserves Player Progress**: Calling `Game.instance.Logout()` ensures the client cleanly saves their character profile (`SavePlayerProfile(setLogoutPoint: true)`) before returning to the main menu.
 - **Informs the Player**: Displays an informative dialog on the main menu informing the player why they were returned to the menu and that their local save was preserved.
 - **Defensive Lifecycle & State Safety**: Centralized state machine (`WatchdogManager`) with atomic, TTL-backed disconnect reasons (`DisconnectReasonManager`) to prevent stale error dialogs across scene transitions.
@@ -48,12 +51,15 @@ The configuration file is automatically generated at `BepInEx/config/dreamwraith
 |---|---|---|---|---|
 | `1 - General` | `TimeoutSeconds` | `float` | `30` | Total seconds of server silence before disconnecting. Halfway through (e.g. 15s), a warning notice is displayed. Range: `0` to `300`. Set to `0` to disable the watchdog. |
 | `1 - General` | `CheckIntervalSeconds` | `float` | `1.0` | Interval in seconds between watchdog checks in the background coroutine. Range: `1.0` to `5.0`. |
+| `1 - General` | `TeleportTimeoutSeconds` | `float` | `30` | Maximum seconds a player can remain in a teleporting state before watchdog health checks resume. Prevents infinite limbo if a portal hangs. Range: `0` to `180`. Set to `0` to disable ceiling. |
 | `2 - On-Screen Notices` | `WarningNoticeMessage` | `string` | `"Server connection lost, attempting to reconnect... ({0}s)"` | Large on-screen center notice displayed at the halfway mark. `{0}` is replaced with remaining seconds. |
 | `2 - On-Screen Notices` | `RecoveredNoticeMessage` | `string` | `"Server connection restored."` | Large on-screen center notice displayed if connection recovers before timeout. |
 | `2 - On-Screen Notices` | `DisconnectNoticeMessage` | `string` | `"Server connection lost. Disconnecting..."` | Large on-screen center notice displayed when timeout is reached. |
+| `2 - On-Screen Notices` | `DisconnectDelaySeconds` | `float` | `5.0` | Seconds to wait after displaying the disconnect notice before executing logout, giving players time to read the notice. Range: `0` to `30`. Set to `0` for instantaneous logout. |
 | `3 - Main Menu Dialog` | `ShowDisconnectReason` | `bool` | `true` | Whether to display an explanatory message on the main menu after being disconnected by this watchdog. |
 | `3 - Main Menu Dialog` | `DisconnectMessage` | `string` | `"Server connection lost (Ghost connection prevented). Progress was saved locally."` | Custom message displayed on the main menu dialog when disconnected. |
 | `4 - Debug` | `EnableDebugLogs` | `bool` | `false` | When enabled, prints detailed debug logs with every watchdog check tick, timer event, threshold evaluation, and connection lifecycle hook. |
+| `4 - Debug` | `DebugSimulateSeverKey` | `KeyCode` | `None` | DEBUG ONLY: Keybind to simulate an abrupt peer disconnection (ServerCharacters behavior). Requires EnableDebugLogs to be true. Keep as None for normal play. |
 
 ---
 

@@ -22,12 +22,15 @@ namespace ClientGhostWatchdog
         // Configuration entries
         public static ConfigEntry<float> TimeoutSeconds = null!;
         public static ConfigEntry<float> CheckIntervalSeconds = null!;
+        public static ConfigEntry<float> TeleportTimeoutSeconds = null!;
         public static ConfigEntry<string> WarningNoticeMessage = null!;
         public static ConfigEntry<string> RecoveredNoticeMessage = null!;
         public static ConfigEntry<string> DisconnectNoticeMessage = null!;
+        public static ConfigEntry<float> DisconnectDelaySeconds = null!;
         public static ConfigEntry<bool> ShowDisconnectReason = null!;
         public static ConfigEntry<string> DisconnectMessage = null!;
         public static ConfigEntry<bool> EnableDebugLogs = null!;
+        public static ConfigEntry<KeyCode> DebugSimulateSeverKey = null!;
 
         private void Awake()
         {
@@ -53,6 +56,15 @@ namespace ClientGhostWatchdog
                     new AcceptableValueRange<float>(1.0f, 5.0f))
             );
 
+            TeleportTimeoutSeconds = Config.Bind(
+                "1 - General",
+                "TeleportTimeoutSeconds",
+                30f,
+                new ConfigDescription(
+                    "Maximum seconds a player can remain in a teleporting/portal state before connection health checks resume. Prevents infinite limbo if a portal handshake hangs. Set to 0 to disable ceiling.",
+                    new AcceptableValueRange<float>(0f, 180f))
+            );
+
             // 2 - On-Screen Notices
             WarningNoticeMessage = Config.Bind(
                 "2 - On-Screen Notices",
@@ -75,6 +87,15 @@ namespace ClientGhostWatchdog
                 "Large on-screen notice displayed when the timeout is reached and the player is being disconnected."
             );
 
+            DisconnectDelaySeconds = Config.Bind(
+                "2 - On-Screen Notices",
+                "DisconnectDelaySeconds",
+                5.0f,
+                new ConfigDescription(
+                    "Seconds to wait after displaying the on-screen disconnect notice before executing logout, giving players time to read the notice. Set to 0 for instantaneous logout.",
+                    new AcceptableValueRange<float>(0f, 30.0f))
+            );
+
             // 3 - Main Menu Dialog
             ShowDisconnectReason = Config.Bind(
                 "3 - Main Menu Dialog",
@@ -86,7 +107,7 @@ namespace ClientGhostWatchdog
             DisconnectMessage = Config.Bind(
                 "3 - Main Menu Dialog",
                 "DisconnectMessage",
-                "Server connection lost (Ghost connection prevented). Progress was saved locally.",
+                "Server connection lost (Ghost connection prevented). Progress was saved.",
                 "Custom message displayed on the main menu dialog when disconnected by this watchdog."
             );
 
@@ -96,6 +117,13 @@ namespace ClientGhostWatchdog
                 "EnableDebugLogs",
                 false,
                 "Whether to print detailed debug logs with every watchdog check, timer tick, and network/lifecycle event."
+            );
+
+            DebugSimulateSeverKey = Config.Bind(
+                "4 - Debug",
+                "DebugSimulateSeverKey",
+                KeyCode.None,
+                "DEBUG ONLY: Keybind to simulate an abrupt external peer disconnection (ServerCharacters behavior). Requires EnableDebugLogs to be true. Keep as None for normal play."
             );
 
             _harmony = new Harmony(ModGUID);
@@ -108,6 +136,43 @@ namespace ClientGhostWatchdog
         {
             WatchdogManager.Stop("Plugin.OnDestroy");
             _harmony?.UnpatchSelf();
+        }
+
+        private void Update()
+        {
+            if (EnableDebugLogs != null && EnableDebugLogs.Value && DebugSimulateSeverKey != null && DebugSimulateSeverKey.Value != KeyCode.None)
+            {
+                if (Input.GetKeyDown(DebugSimulateSeverKey.Value))
+                {
+                    SimulateSeveredPeer();
+                }
+            }
+        }
+
+        // Simulates badly behaved third-party mod behavior (e.g. ServerCharacters abruptly calling ZNet.Disconnect on the server peer)
+        internal static void SimulateSeveredPeer()
+        {
+            if (EnableDebugLogs == null || !EnableDebugLogs.Value)
+            {
+                Log.LogWarning("[DEBUG TEST] Cannot simulate peer disconnect: EnableDebugLogs must be true in config.");
+                return;
+            }
+
+            if (ZNet.instance == null || ZNet.instance.IsServer() || Player.m_localPlayer == null)
+            {
+                Log.LogWarning("[DEBUG TEST] Cannot simulate peer disconnect: Must be in an active multiplayer session as a client.");
+                return;
+            }
+
+            ZNetPeer serverPeer = ZNet.instance.GetServerPeer();
+            if (serverPeer == null)
+            {
+                Log.LogWarning("[DEBUG TEST] Server peer is already null.");
+                return;
+            }
+
+            Log.LogWarning("[DEBUG TEST] Intentionally calling ZNet.instance.Disconnect(serverPeer) to simulate badly behaved third-party mod behavior...");
+            ZNet.instance.Disconnect(serverPeer);
         }
 
         // Conditionally emits detailed debug messages when EnableDebugLogs is true
@@ -129,6 +194,7 @@ namespace ClientGhostWatchdog
         private static bool s_isWarningActive = false;
         private static int s_lastLoggedRemainingSec = -1;
         private static float s_lastNoticeDisplayTime = 0f;
+        private static float s_teleportStartTime = -1f;
 
         public static bool IsRunning => s_watchdogCoroutine != null;
         public static bool IsWarningActive => s_isWarningActive;
@@ -181,6 +247,49 @@ namespace ClientGhostWatchdog
             s_isWarningActive = false;
             s_lastLoggedRemainingSec = -1;
             s_lastNoticeDisplayTime = 0f;
+            s_teleportStartTime = -1f;
+        }
+
+        // Safely displays the disconnect notice, waits for the configured delay, and logs out
+        private static IEnumerator DisconnectRoutine(string reasonDetail)
+        {
+            Plugin.Log.LogWarning($"[ClientGhostWatchdog] {reasonDetail}. Forcing clean logout to preserve player progress.");
+            s_isWarningActive = false;
+
+            // Only display watchdog banner and custom menu dialog if connection was still Connected.
+            // If native already registered a specific error (e.g. ErrorKicked, ErrorBanned, ErrorFull),
+            // preserve it so the player is not misled by a watchdog banner and sees the true native disconnect reason.
+            if (ZNet.GetConnectionStatus() == ZNet.ConnectionStatus.Connected)
+            {
+                if (MessageHud.instance != null && !string.IsNullOrEmpty(Plugin.DisconnectNoticeMessage.Value))
+                {
+                    MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, Plugin.DisconnectNoticeMessage.Value);
+                }
+
+                if (Plugin.ShowDisconnectReason.Value)
+                {
+                    DisconnectReasonManager.SetReason(Plugin.DisconnectMessage.Value);
+                }
+
+                float delay = Mathf.Clamp(Plugin.DisconnectDelaySeconds?.Value ?? 5f, 0f, 30f);
+                if (delay > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(delay);
+                }
+
+                ZNet.SetExternalError(ZNet.ConnectionStatus.ErrorDisconnected);
+            }
+            else
+            {
+                Plugin.LogDebug($"DisconnectRoutine: Preserving existing native connection status ({ZNet.GetConnectionStatus()}).");
+            }
+
+            s_watchdogCoroutine = null;
+
+            if (Game.instance != null && !Game.instance.IsShuttingDown())
+            {
+                Game.instance.Logout();
+            }
         }
 
         // Main watchdog loop checking server responsiveness at configured intervals
@@ -199,7 +308,7 @@ namespace ClientGhostWatchdog
                     continue;
                 }
 
-                // Stop immediately if state transitions to local host or disconnected
+                // 1. Guard against local solo singleplayer and local server hosts
                 if (ZNet.instance == null || ZNet.instance.IsServer())
                 {
                     Plugin.LogDebug($"Watchdog tick: Terminating. Local world or server host detected (instance null: {ZNet.instance == null}, IsServer: {ZNet.instance?.IsServer()}).");
@@ -207,13 +316,7 @@ namespace ClientGhostWatchdog
                     yield break;
                 }
 
-                if (ZNet.GetConnectionStatus() != ZNet.ConnectionStatus.Connected)
-                {
-                    Plugin.LogDebug($"Watchdog tick: Terminating. Connection status is {ZNet.GetConnectionStatus()} (not Connected).");
-                    s_watchdogCoroutine = null;
-                    yield break;
-                }
-
+                // 2. Terminate if game is shutting down
                 if (Game.instance == null || Game.instance.IsShuttingDown())
                 {
                     Plugin.LogDebug("Watchdog tick: Terminating. Game instance is null or shutting down.");
@@ -221,57 +324,88 @@ namespace ClientGhostWatchdog
                     yield break;
                 }
 
-                // Suppress checks during player teleportation or initial loading
-                if (Player.m_localPlayer == null || Player.m_localPlayer.IsTeleporting())
+                // 3. Consolidated connection status check (handles both in-game and pre-spawn disconnects)
+                if (ZNet.GetConnectionStatus() != ZNet.ConnectionStatus.Connected)
                 {
-                    Plugin.LogDebug($"Watchdog tick: Skipping check during transient player state (localPlayer null: {Player.m_localPlayer == null}, isTeleporting: {Player.m_localPlayer?.IsTeleporting()}).");
+                    if (Player.m_localPlayer != null)
+                    {
+                        // In-game: save profile and show disconnect notice
+                        yield return DisconnectRoutine($"Connection status lost ({ZNet.GetConnectionStatus()})");
+                    }
+                    else
+                    {
+                        // Pre-spawn loading: connection aborted before entering world, stop silently
+                        Plugin.LogDebug($"Watchdog tick: Initial connection status is {ZNet.GetConnectionStatus()} before player spawn. Terminating.");
+                        s_watchdogCoroutine = null;
+                    }
+                    yield break;
+                }
+
+                // 4. Pre-spawn wait: Connected, but character has not spawned into the world yet
+                if (Player.m_localPlayer == null)
+                {
+                    Plugin.LogDebug("Watchdog tick: Waiting for local player to spawn into world...");
                     continue;
                 }
 
+                // 5. Player is actively in the world. Handle teleportation transient state with a timeout guard
+                if (Player.m_localPlayer.IsTeleporting())
+                {
+                    float maxTeleport = Plugin.TeleportTimeoutSeconds.Value;
+
+                    // If configured to 0 or negative, suppress checks indefinitely while teleporting
+                    if (maxTeleport <= 0f)
+                    {
+                        Plugin.LogDebug("Watchdog tick: Skipping check during player teleportation (ceiling disabled via config).");
+                        continue;
+                    }
+
+                    if (s_teleportStartTime < 0f)
+                    {
+                        s_teleportStartTime = Time.unscaledTime;
+                    }
+
+                    float teleportElapsed = Time.unscaledTime - s_teleportStartTime;
+                    if (teleportElapsed < maxTeleport)
+                    {
+                        Plugin.LogDebug($"Watchdog tick: Skipping check during player teleportation (elapsed: {teleportElapsed:F1}s / max: {maxTeleport:F1}s).");
+                        continue;
+                    }
+
+                    Plugin.Log.LogWarning($"[ClientGhostWatchdog] Player has been in teleporting state for {teleportElapsed:F1}s (ceiling: {maxTeleport:F1}s). Resuming connection health checks.");
+                }
+                else
+                {
+                    s_teleportStartTime = -1f;
+                }
+
+                // 6. Check server peer existence and socket health
+                // In Valheim, if another mod (such as ServerCharacters) or the network layer calls ZNet.instance.Disconnect(peer),
+                // the server peer is removed and disposed. In multiplayer, a null server peer while in-world means connection is severed!
                 ZNetPeer serverPeer = ZNet.instance.GetServerPeer();
                 if (serverPeer == null || serverPeer.m_rpc == null)
                 {
-                    Plugin.LogDebug("Watchdog tick: Server peer or rpc is null, skipping check.");
-                    continue;
+                    yield return DisconnectRoutine("Server peer connection lost (disposed by network layer)");
+                    yield break;
                 }
 
                 bool socketClosed = !serverPeer.m_rpc.IsConnected();
+                if (socketClosed)
+                {
+                    yield return DisconnectRoutine("Server socket connection closed");
+                    yield break;
+                }
+
                 float timeSincePing = serverPeer.m_rpc.GetTimeSinceLastPing();
                 float timeout = Plugin.TimeoutSeconds.Value;
                 float warningThreshold = timeout / 2f;
 
                 Plugin.LogDebug($"Watchdog check: pingSilence={timeSincePing:F2}s, socketClosed={socketClosed}, warningThreshold={warningThreshold:F1}s, timeout={timeout:F1}s, warningActive={s_isWarningActive}");
 
-                // Stage 2: Server socket closed or ping silence exceeded timeout threshold -> clean disconnect
-                if (socketClosed || timeSincePing >= timeout)
+                // Stage 2: Ping silence exceeded timeout threshold -> clean disconnect
+                if (timeSincePing >= timeout)
                 {
-                    string reasonDetail = socketClosed
-                        ? "Server socket connection closed"
-                        : $"Server stopped responding to pings for {timeSincePing:F1}s (threshold: {timeout:F1}s)";
-
-                    Plugin.Log.LogWarning($"[ClientGhostWatchdog] {reasonDetail}. Forcing clean logout to preserve player progress.");
-                    Plugin.LogDebug($"Watchdog trigger: Stage 2 disconnect initiated. Reason: {reasonDetail}");
-
-                    if (MessageHud.instance != null && !string.IsNullOrEmpty(Plugin.DisconnectNoticeMessage.Value))
-                    {
-                        MessageHud.instance.ShowMessage(
-                            MessageHud.MessageType.Center,
-                            Plugin.DisconnectNoticeMessage.Value
-                        );
-                    }
-
-                    ZNet.SetExternalError(ZNet.ConnectionStatus.ErrorDisconnected);
-
-                    if (Plugin.ShowDisconnectReason.Value)
-                    {
-                        DisconnectReasonManager.SetReason(Plugin.DisconnectMessage.Value);
-                    }
-
-                    s_isWarningActive = false;
-                    s_watchdogCoroutine = null;
-
-                    // Game.instance.Logout() triggers SavePlayerProfile(setLogoutPoint: true) before exiting world
-                    Game.instance.Logout();
+                    yield return DisconnectRoutine($"Server stopped responding to pings for {timeSincePing:F1}s (threshold: {timeout:F1}s)");
                     yield break;
                 }
 
@@ -399,7 +533,7 @@ namespace ClientGhostWatchdog
 
             if (startup.m_connectionFailedError != null)
             {
-                // Disable Localize component to prevent vanilla from overwriting custom text with generic "Disconnected"
+                // Disable Localize component to prevent native from overwriting custom text with generic "Disconnected"
                 var localize = startup.m_connectionFailedError.GetComponent("Localize") as Behaviour;
                 if (localize != null)
                 {
@@ -475,6 +609,7 @@ namespace ClientGhostWatchdog
         }
     }
 
+
     // Stop watchdog on network shutdown
     [HarmonyPatch(typeof(ZNet), "Shutdown")]
     public static class ZNet_Shutdown_Patch
@@ -532,6 +667,29 @@ namespace ClientGhostWatchdog
             }
 
             DisconnectReasonManager.Clear();
+        }
+    }
+
+    // Register debug console command for simulating badly behaved peer severance
+    [HarmonyPatch(typeof(Terminal), "InitTerminal")]
+    public static class Terminal_InitTerminal_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix()
+        {
+            if (Terminal.commands.ContainsKey("cgw_simulatesever"))
+            {
+                return;
+            }
+
+            new Terminal.ConsoleCommand(
+                "cgw_simulatesever",
+                "Simulates an abrupt external peer severance (ServerCharacters behavior) for watchdog testing.",
+                (Terminal.ConsoleEventArgs args) =>
+                {
+                    Plugin.SimulateSeveredPeer();
+                }
+            );
         }
     }
 }
