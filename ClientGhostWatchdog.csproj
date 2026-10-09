@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <Version>1.1.2</Version>
+    <Version>1.1.3</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
@@ -19,6 +19,10 @@
     <Description>Client-side watchdog mod for players connecting to Valheim servers that detects dropped connections and disconnects cleanly to prevent ghost desyncs. For more information, visit https://github.com/dreamwraith</Description>
     <PackageProjectUrl>https://github.com/dreamwraith</PackageProjectUrl>
     <RepositoryUrl>https://github.com/dreamwraith</RepositoryUrl>
+    <!-- Nexus Mods Identifiers -->
+    <NexusModId>4328</NexusModId>
+    <NexusFileId>
+    </NexusFileId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>

@@ -2,6 +2,12 @@
 
 All notable changes to **ClientGhostWatchdog** will be documented in this file.
 
+## [1.1.3] - 2026-10-08
+
+### Changed & Improved
+- Centralized build and release automation tooling to shared `DW.ValheimModTools`.
+- Added support for automated Nexus Mods packaging and publishing.
+
 ## [1.1.2] - 2026-10-08
 
 ### Changed & Improved
