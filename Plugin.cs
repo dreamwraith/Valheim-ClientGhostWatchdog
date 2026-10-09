@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
@@ -14,6 +15,7 @@ namespace ClientGhostWatchdog
         public const string ModGUID = "dreamwraith.ClientGhostWatchdog";
         public const string ModName = "ClientGhostWatchdog";
         public const string ModVersion = VersionInfo.Version;
+        public const string NetworkPerformanceSystemGUID = "MidnightsFX.NetworkPerformanceSystem";
 
         internal static Plugin? Instance { get; private set; }
         internal static ManualLogSource Log = null!;
@@ -130,6 +132,14 @@ namespace ClientGhostWatchdog
             _harmony.PatchAll();
 
             Log.LogInfo($"{ModName} v{ModVersion} loaded successfully.");
+        }
+
+        private void Start()
+        {
+            if (Chainloader.PluginInfos.ContainsKey(NetworkPerformanceSystemGUID))
+            {
+                Log.LogInfo($"Detected {NetworkPerformanceSystemGUID}; NPS client watchdog stood down in favor of {ModName}.");
+            }
         }
 
         private void OnDestroy()

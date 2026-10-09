@@ -1,11 +1,22 @@
 # ClientGhostWatchdog
 
+[![GitHub Release](https://img.shields.io/github/v/release/dreamwraith/Valheim-ClientGhostWatchdog?logo=github&color=1081c2)](https://github.com/dreamwraith/Valheim-ClientGhostWatchdog/releases)
+[![GitHub Downloads](https://img.shields.io/github/downloads/dreamwraith/Valheim-ClientGhostWatchdog/total?logo=github&color=1081c2)](https://github.com/dreamwraith/Valheim-ClientGhostWatchdog/releases)
+[![Last Commit](https://img.shields.io/github/last-commit/dreamwraith/Valheim-ClientGhostWatchdog?logo=git)](https://github.com/dreamwraith/Valheim-ClientGhostWatchdog/commits/main)
+[![Publish Status](https://img.shields.io/github/actions/workflow/status/dreamwraith/Valheim-ClientGhostWatchdog/publish.yml?label=Publish%20Portals&logo=githubactions)](https://github.com/dreamwraith/Valheim-ClientGhostWatchdog/actions)
+[![Thunderstore Downloads](https://img.shields.io/thunderstore/dt/DreamWraith/ClientGhostWatchdog?logo=thunderstore)](https://thunderstore.io/c/valheim/p/DreamWraith/ClientGhostWatchdog/)
+[![Hexium](https://img.shields.io/badge/Hexium-ClientGhostWatchdog-6c5ce7)](https://valheim.hexium.gg/mods/DreamWraith/ClientGhostWatchdog)
+[![Game: Valheim](https://img.shields.io/badge/Valheim-Deep_North_%2F_1.x-1b2838?logo=steam&logoColor=white)](https://store.steampowered.com/app/892970/Valheim/)
+[![BepInEx Pack](https://img.shields.io/thunderstore/v/denikson/BepInExPack_Valheim?label=BepInEx&color=5B57E7)](https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/)
+[![Target: .NET 4.8](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4?logo=dotnet)](ClientGhostWatchdog.csproj)
+[![Client Side Only](https://img.shields.io/badge/Type-100%25%20Client--Side-brightgreen)](README.md#the-solution)
+[![License](https://img.shields.io/github/license/dreamwraith/Valheim-ClientGhostWatchdog?color=blue)](LICENSE.md)
+[![AI Philosophy](https://img.shields.io/badge/AI%20Philosophy-Software%20Craft-2ea44f?logo=github)](https://gist.github.com/dreamwraith/77c91d656c842611bf8c40febf8056f2)
+
 A standalone, 100% client-side watchdog mod for players connecting to remote/dedicated Valheim servers that prevents **"Zombie Client" / "Ghost Connection"** desync states.
 
 > [!NOTE]
 > **Client-Side Only:** This mod is installed locally on your PC. It does **not** need to be installed on the server and works when connecting to any dedicated or community server.
-
----
 
 ## The Problem
 
@@ -82,7 +93,7 @@ The project uses a portable MSBuild configuration that auto-detects standard Ste
 dotnet build -c Release
 ```
 
-The compiled assembly will be placed in `bin/Release/net48/ClientGhostWatchdog.dll`.
+The compiled assembly will be placed in `bin/Release/net48/ClientGhostWatchdog.dll`. Building in `Release` configuration also automatically packages the distribution ZIP to `bin/Publish/ClientGhostWatchdog-<Version>.zip`.
 
 ### Custom & CI Paths
 For custom installations or CI/CD pipelines, you can specify paths using environment variables or a local `.user` property file:
@@ -104,48 +115,19 @@ For custom installations or CI/CD pipelines, you can specify paths using environ
 
 ---
 
-## License
+## Packaging, Publishing & Releases
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE.md](LICENSE.md) file for details.
+All developer automation tools for release management, packaging, and publishing to **Thunderstore** and **Hexium** are organized in the [`.scripts/`](.scripts/) folder:
 
----
+- **Release Management**: [`release.ps1`](.scripts/release.ps1) compiles in `Release`, creates mod & source archives, extracts changelog notes, and publishes GitHub Releases (Draft by default, or published with `-Publish`) using the `gh` CLI.
+- **Packaging & Version Bumping**: [`package.ps1`](.scripts/package.ps1) increments SemVer in `ClientGhostWatchdog.csproj`, updates `manifest.json`, and bundles distribution archives.
+- **Portal Publishing**: [`publish.ps1`](.scripts/publish.ps1) uploads directly to Thunderstore and Hexium APIs.
+- **CI/CD Workflow**: [`.github/workflows/publish.yml`](.github/workflows/publish.yml) provides an automated GitHub Actions workflow to publish to Thunderstore and Hexium whenever a GitHub Release is published.
 
-## A Small Note from Me about Valheim Modding Specifically
+For detailed documentation on flags, workflows, and secret configuration, see [`.scripts/README.md`](.scripts/README.md).
 
-I created this mod to solve a very real problem my friends who live in remote or internet challenged circumstances continue to encounter. I am admittedly naive and green in the world of Valheim/Unity modding, but I am far from new to software development or working with complex systems.
 
-The current state of the Valheim modding community, not unlike all modding communities, is replete with factions, infighting, disagreements, and unsavory folk as much as it is full of amazing people who just want to share their joy with others. I firmly believe in a space such as modding, all things should be open in nature, not gatekept. As such, this will be licensed under GPL 3.0. To any of you modders out there in the community who feels similarly, I'm open to learning more and helping grow the open source modding scene as much as I can.
-
-That openness extends to the human just as much as the code. That is to say, while I hold no ill will towards any particular individuals, I will not hold back in calling out bigotry, in particular identity or sexually based hate speech or discrimination, or gatekeeping within the community for any reason. If you are that kind of person, or that kind of modder, don't expect any slack from me. I will work with others to replace your work with similar. Call it knock-off work, if you must, but I will sleep soundly knowing that I am doing it to spite your hateful ass. If you are against those hateful people, and things they say and do, then I hope you will consider this an olive branch extended to you, as well as an apology on behalf of those too stupid or too self-loathing to accept the error of their ways. I do realize that many modders have, and continue to put in countless hours into this game, and have put in even more hours into open-sourcing many of their mods, and I am endlessly appreciative of that, as it has resulted in much joy in my life. I only hope to be able to contribute to that end of things, in an accepting and open environment.
-
-Peace, Love, and Joy in All things - unless you're a bigoted, transphobic, gatekeeping, jerk - In which case you can kindly fuck off.
-
----
-
-> [!CAUTION]
-> ### Excerpts From: "A Note on AI, Software Craft, and Why This Code Exists" by dreamwraith, via ed-galaxy-sync
->
-> I want to be upfront and blunt about how AI was used on this project, where I draw a hard line in the sand, and more importantly, how I feel about it on a more broad level.
->
-> Look... I have massive, fundamental gripes with artificial intelligence. The environmental toll of running massive data center furnaces is pretty disgusting, and the blatant theft of scraping people's work without permission is impossible to defend. A couple of years ago, corporate executives used the hype around AI as a convenient excuse to lay me off. Since then, while I've watched former coworkers get dragged through the mud of mindless "you MUST use AI for everything" corporate mandates, I've managed to stay employed the old-fashioned way, by actually knowing how to solve hard problems, understand systems, and write real code.
->
-> Watching people posture as "artists" or "creators" while generating synthetic images, fake voice acting, or slop stories and lore makes my blood curdle. It's not creativity, it's literal theft, laundering the actual talent, sweat, and soul of real human beings into digitized mush.
->
-> But programming has always lived in a messy, chaotic in between or trench or some shit. I have never considered raw lines of syntax as some high art form. The real craft is the ideas, the problems, and how you solve them, the architecture that is designed, with a wholistic view. It's figuring out where data lives, how state transitions, how things crash when everything hits the fan, and how to model messy real-world garbage. In that context, using an LLM to bounce ideas off of, write boring documentation, check syntax, or scaffold boilerplate isn't much different than copy-pasting from Stack Overflow or leaning on IntelliSense and autocomplete, tools that Visual Studio and other IDEs have given us for decades. It speeds up the typing, but it doesn't do the godddamned thinking!
->
->...
->
-> Those are just the high (low?) lights. An AI cannot design that journey. An AI can read code, but it doesn't have the lived experience of being a software developer or senior data engineer for decades. It doesn't know the sheer misery of a database lock timeout at 2 in the morning. It doesn't know when a design has hit a brick wall, and it sure as hell won't decide to tear down working code and throw away days of effort just to build something better. Hell, it will more often do everything it can to preserve completely dead code paths as "fallback" logic rather than nuke everything and start over. Those choices only come from stubborn human curiosity, frustration, and bruised egos from riding the high of feeling like it works, only to realize your design sucks and you have to redo it all over again.
->
-> We're also living in a bubble right now, not dissimilar, but in my opinion, far worse than the dot com bubble of my youth. Venture capital is burning billions (trillions?) to subsidize cheap API tokens, making LLMs look practically free. That party *IS* going to end. When the real bills come due, prices will spike, the subsidies will evaporate, and anyone who relied on AI to build crap they don't actually understand is going to be dead in the water. People, normal people, will lose everything because of the greed and insanity of people who are wealthy, or who think claude already thinks and feels. The only real safety net in software, nay, in life even, is knowing how to build, read, create, modify, throw away, and goddamnit just DO things yourself.
->
-> I used AI here as a rubber duck, a technical documentation assistant, and an accelerator for repetitive grunt work. But **I take 100% personal responsibility for every single line of code in this repository.** Every schema, spatial query, stored procedure, migration script, and edge-case handler was manually inspected, reasoned through, rewritten, and held to my own standards*.
->
-> <small>*\*(It should be noted that I HATE writing unit tests and documentation, so those standards might be a bit lower... :D)*</small>
-> 
-> **If something breaks in this toolset, that's on me, not the machine.**
->
-> ---
->
-> **A Final Thought on the Bigger Picture:**
-> Beyond the code, lets all be clear-eyed about what's happening. The wealthy elite and tech oligarchs aren't pushing AI to make our lives better, they're using it to cut payroll, consolidate power, further enrich themeselves, and keep the working class under their thumb. They will continue to tighten the screws on our necks at every opportunity. At the same time, it risks becoming a sort of digital, mental methadone, numbing our curiosity, dulling our critical thinking, and training both programmers and non-programmers alike to passively accept whatever synthetic mush a machine feeds them. Use it as a tool, but keep it firmly in that category. The circular saw doesn't build the house any more than the hammer. Don't let it rot your brain. For fucks sake! Don't let AI or LLM's replace your brain. Keep building real things with your own hands, feet, or whatever appendages you may have available to you (shout out to my differently abled homies).
+## License, Author Notes
+- This project is licensed under the GNU General Public License v3.0 - see the [LICENSE.md](LICENSE.md) file for details.
+- [**A Small Note from Me about Valheim Modding Specifically**](https://gist.github.com/dreamwraith/98564f8441dc234bfadd7e2b605c694c) - Thoughts on open-source modding, community inclusivity, and anti-gatekeeping.
+- [**A Note on AI, Software Craft, and Why This Code Exists**](https://gist.github.com/dreamwraith/77c91d656c842611bf8c40febf8056f2) - Personal essay on software craft, human agency, and engineering responsibility.

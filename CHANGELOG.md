@@ -2,6 +2,13 @@
 
 All notable changes to **ClientGhostWatchdog** will be documented in this file.
 
+## [1.1.1] - 2026-10-08
+
+### Changed & Improved
+- Added detection and coexistence logging for `NetworkPerformanceSystem` (`MidnightsFX.NetworkPerformanceSystem`).
+- Modernized project packaging and release automation tooling.
+- Readme Cleanup
+
 ## [1.1.0] - 2026-09-17
 
 ### Fixed & Improved
