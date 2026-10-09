@@ -2,6 +2,11 @@
 
 All notable changes to **ClientGhostWatchdog** will be documented in this file.
 
+## [1.1.2] - 2026-10-08
+
+### Changed & Improved
+- Fixed readme issues.
+
 ## [1.1.1] - 2026-10-08
 
 ### Changed & Improved
