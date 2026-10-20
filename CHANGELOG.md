@@ -2,6 +2,14 @@
 
 All notable changes to **ClientGhostWatchdog** will be documented in this file.
 
+## [1.2.0] - 2026-10-19
+
+### Changed
+- Switch to compile-time publicized game assemblies via Jötunn prebuild task (`DoPrebuild.props`, `JotunnLib`).
+- Use `nameof(...)` for Harmony patch method targets across `ZNet`, `Game`, `FejdStartup`, and `Terminal`.
+- Remove Hexium publish target and tooling.
+- Simplified Unity and config null checks.
+
 ## [1.1.3] - 2026-10-08
 
 ### Changed & Improved

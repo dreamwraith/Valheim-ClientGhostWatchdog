@@ -150,7 +150,7 @@ namespace ClientGhostWatchdog
 
         private void Update()
         {
-            if (EnableDebugLogs != null && EnableDebugLogs.Value && DebugSimulateSeverKey != null && DebugSimulateSeverKey.Value != KeyCode.None)
+            if (EnableDebugLogs.Value && DebugSimulateSeverKey.Value != KeyCode.None)
             {
                 if (Input.GetKeyDown(DebugSimulateSeverKey.Value))
                 {
@@ -162,13 +162,13 @@ namespace ClientGhostWatchdog
         // Simulates badly behaved third-party mod behavior (e.g. ServerCharacters abruptly calling ZNet.Disconnect on the server peer)
         internal static void SimulateSeveredPeer()
         {
-            if (EnableDebugLogs == null || !EnableDebugLogs.Value)
+            if (!EnableDebugLogs.Value)
             {
                 Log.LogWarning("[DEBUG TEST] Cannot simulate peer disconnect: EnableDebugLogs must be true in config.");
                 return;
             }
 
-            if (ZNet.instance == null || ZNet.instance.IsServer() || Player.m_localPlayer == null)
+            if (!ZNet.instance || ZNet.instance.IsServer() || !Player.m_localPlayer)
             {
                 Log.LogWarning("[DEBUG TEST] Cannot simulate peer disconnect: Must be in an active multiplayer session as a client.");
                 return;
@@ -188,7 +188,7 @@ namespace ClientGhostWatchdog
         // Conditionally emits detailed debug messages when EnableDebugLogs is true
         internal static void LogDebug(string message)
         {
-            if (EnableDebugLogs != null && EnableDebugLogs.Value)
+            if (EnableDebugLogs.Value)
             {
                 Log.LogInfo($"[DEBUG] {message}");
             }
@@ -229,7 +229,7 @@ namespace ClientGhostWatchdog
 
             Stop($"restarting from {caller}");
 
-            if (Plugin.Instance != null)
+            if (Plugin.Instance)
             {
                 s_watchdogCoroutine = Plugin.Instance.StartCoroutine(WatchdogRoutine());
                 Plugin.Log.LogInfo("[ClientGhostWatchdog] Watchdog coroutine started for server connection.");
@@ -243,7 +243,7 @@ namespace ClientGhostWatchdog
             if (s_watchdogCoroutine != null)
             {
                 Plugin.LogDebug($"WatchdogManager.Stop: Halting active coroutine. Reason: {reason}.");
-                if (Plugin.Instance != null)
+                if (Plugin.Instance)
                 {
                     Plugin.Instance.StopCoroutine(s_watchdogCoroutine);
                 }
@@ -271,7 +271,7 @@ namespace ClientGhostWatchdog
             // preserve it so the player is not misled by a watchdog banner and sees the true native disconnect reason.
             if (ZNet.GetConnectionStatus() == ZNet.ConnectionStatus.Connected)
             {
-                if (MessageHud.instance != null && !string.IsNullOrEmpty(Plugin.DisconnectNoticeMessage.Value))
+                if (MessageHud.instance && !string.IsNullOrEmpty(Plugin.DisconnectNoticeMessage.Value))
                 {
                     MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, Plugin.DisconnectNoticeMessage.Value);
                 }
@@ -296,7 +296,7 @@ namespace ClientGhostWatchdog
 
             s_watchdogCoroutine = null;
 
-            if (Game.instance != null && !Game.instance.IsShuttingDown())
+            if (Game.instance && !Game.instance.IsShuttingDown())
             {
                 Game.instance.Logout();
             }
@@ -536,16 +536,16 @@ namespace ClientGhostWatchdog
 
         private static void ApplyTextAndShowPanel(FejdStartup startup, string reason)
         {
-            if (startup.m_connectionFailedPanel != null)
+            if (startup.m_connectionFailedPanel)
             {
                 startup.m_connectionFailedPanel.SetActive(true);
             }
 
-            if (startup.m_connectionFailedError != null)
+            if (startup.m_connectionFailedError)
             {
                 // Disable Localize component to prevent native from overwriting custom text with generic "Disconnected"
                 var localize = startup.m_connectionFailedError.GetComponent("Localize") as Behaviour;
-                if (localize != null)
+                if (localize)
                 {
                     localize.enabled = false;
                 }
@@ -569,7 +569,7 @@ namespace ClientGhostWatchdog
     }
 
     // Start watchdog once the client successfully completes peer handshake with dedicated server
-    [HarmonyPatch(typeof(ZNet), "RPC_PeerInfo")]
+    [HarmonyPatch(typeof(ZNet), nameof(ZNet.RPC_PeerInfo))]
     public static class ZNet_RPC_PeerInfo_Patch
     {
         [HarmonyPostfix]
@@ -588,7 +588,7 @@ namespace ClientGhostWatchdog
     }
 
     // Ensure watchdog runs when entering a game session connected to a dedicated server
-    [HarmonyPatch(typeof(Game), "Start")]
+    [HarmonyPatch(typeof(Game), nameof(Game.Start))]
     public static class Game_Start_Patch
     {
         [HarmonyPostfix]
@@ -608,7 +608,7 @@ namespace ClientGhostWatchdog
     }
 
     // Stop watchdog upon leaving the game world
-    [HarmonyPatch(typeof(Game), "OnDestroy")]
+    [HarmonyPatch(typeof(Game), nameof(Game.OnDestroy))]
     public static class Game_OnDestroy_Patch
     {
         [HarmonyPostfix]
@@ -621,7 +621,7 @@ namespace ClientGhostWatchdog
 
 
     // Stop watchdog on network shutdown
-    [HarmonyPatch(typeof(ZNet), "Shutdown")]
+    [HarmonyPatch(typeof(ZNet), nameof(ZNet.Shutdown))]
     public static class ZNet_Shutdown_Patch
     {
         [HarmonyPostfix]
@@ -633,7 +633,7 @@ namespace ClientGhostWatchdog
     }
 
     // Display disconnect reason when FejdStartup shows connection error dialog
-    [HarmonyPatch(typeof(FejdStartup), "ShowConnectError")]
+    [HarmonyPatch(typeof(FejdStartup), nameof(FejdStartup.ShowConnectError))]
     public static class FejdStartup_ShowConnectError_Patch
     {
         [HarmonyPostfix]
@@ -646,7 +646,7 @@ namespace ClientGhostWatchdog
     }
 
     // Check for pending disconnect reason when main menu initializes
-    [HarmonyPatch(typeof(FejdStartup), "Start")]
+    [HarmonyPatch(typeof(FejdStartup), nameof(FejdStartup.Start))]
     public static class FejdStartup_Start_Patch
     {
         [HarmonyPostfix]
@@ -659,7 +659,7 @@ namespace ClientGhostWatchdog
     }
 
     // Re-enable Localize component and clear disconnect reason once player acknowledges popup
-    [HarmonyPatch(typeof(FejdStartup), "OnConnectionFailedOk")]
+    [HarmonyPatch(typeof(FejdStartup), nameof(FejdStartup.OnConnectionFailedOk))]
     public static class FejdStartup_OnConnectionFailedOk_Patch
     {
         [HarmonyPostfix]
@@ -681,7 +681,7 @@ namespace ClientGhostWatchdog
     }
 
     // Register debug console command for simulating badly behaved peer severance
-    [HarmonyPatch(typeof(Terminal), "InitTerminal")]
+    [HarmonyPatch(typeof(Terminal), nameof(Terminal.InitTerminal))]
     public static class Terminal_InitTerminal_Patch
     {
         [HarmonyPostfix]
