@@ -72,7 +72,7 @@ namespace ClientGhostWatchdog
                 "2 - On-Screen Notices",
                 "WarningNoticeMessage",
                 "Server connection lost, attempting to reconnect... ({0}s)",
-                "Large on-screen notice displayed halfway through the check period. {0} is replaced with remaining seconds until disconnect."
+                "Large on-screen notice displayed halfway through TimeoutSeconds. {0} is replaced with remaining seconds until disconnect."
             );
 
             RecoveredNoticeMessage = Config.Bind(

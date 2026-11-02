@@ -11,9 +11,9 @@
     <Version>1.2.0</Version>
     <PackageWebsiteUrl>https://github.com/dreamwraith/Valheim-ClientGhostWatchdog</PackageWebsiteUrl>
     <PackageDescription>Client-side watchdog mod for players connecting to Valheim servers that detects dropped connections and disconnects cleanly to prevent ghost desyncs.</PackageDescription>
-    <Authors>dreamwraith</Authors>
-    <Company>dreamwraith (https://github.com/dreamwraith)</Company>
-    <Copyright>Copyright (c) 2026 dreamwraith</Copyright>
+    <Authors>DreamWraith</Authors>
+    <Company>DreamWraith (https://github.com/dreamwraith)</Company>
+    <Copyright>Copyright (c) 2026 DreamWraith</Copyright>
     <Description>$(PackageDescription)</Description>
     <PackageProjectUrl>https://github.com/dreamwraith/Valheim-ClientGhostWatchdog</PackageProjectUrl>
     <RepositoryUrl>https://github.com/dreamwraith/Valheim-ClientGhostWatchdog</RepositoryUrl>
