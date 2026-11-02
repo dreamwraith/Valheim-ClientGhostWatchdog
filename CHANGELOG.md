@@ -2,6 +2,14 @@
 
 All notable changes to **ClientGhostWatchdog** will be documented in this file.
 
+## [1.2.1] - 2026-11-01
+
+### Changed
+- Skips its patches and the debug key check on dedicated servers.
+- Fixed the warning notice config description, it drifted during dev.
+- Bumped BepInExPack to 5.4.2360.
+- Build tooling and source layout now match the rest of my mods.
+
 ## [1.2.0] - 2026-10-19
 
 ### Changed
