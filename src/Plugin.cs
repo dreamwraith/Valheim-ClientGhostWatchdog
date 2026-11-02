@@ -5,6 +5,7 @@ using ClientGhostWatchdog.Configuration;
 using ClientGhostWatchdog.Watchdog;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace ClientGhostWatchdog
 {
@@ -26,6 +27,13 @@ namespace ClientGhostWatchdog
             Log = Logger;
 
             ModConfig.Initialize(Config);
+
+            // same check as jotunns GUIManager.IsHeadless(), jotunn isnt here at runtime
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+            {
+                enabled = false;
+                return;
+            }
 
             _harmony = new Harmony(ModGUID);
             _harmony.PatchAll();
