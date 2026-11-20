@@ -1,28 +1,13 @@
 using HarmonyLib;
-using ClientGhostWatchdog.Watchdog;
+using ClientGhostWatchdog.Core.Watchdog;
 
 namespace ClientGhostWatchdog.Patches
 {
-    // Register debug console command for simulating badly behaved peer severance
-    [HarmonyPatch(typeof(Terminal), nameof(Terminal.InitTerminal))]
-    public static class Terminal_InitTerminal_Patch
+    [HarmonyPatch(typeof(Terminal))]
+    internal static class TerminalPatches
     {
         [HarmonyPostfix]
-        public static void Postfix()
-        {
-            if (Terminal.commands.ContainsKey("cgw_simulatesever"))
-            {
-                return;
-            }
-
-            new Terminal.ConsoleCommand(
-                "cgw_simulatesever",
-                "Simulates an abrupt external peer severance (ServerCharacters behavior) for watchdog testing.",
-                (Terminal.ConsoleEventArgs args) =>
-                {
-                    WatchdogManager.SimulateSeveredPeer();
-                }
-            );
-        }
+        [HarmonyPatch(nameof(Terminal.InitTerminal))]
+        private static void InitTerminalPostfix() => WatchdogManager.RegisterConsoleCommands();
     }
 }

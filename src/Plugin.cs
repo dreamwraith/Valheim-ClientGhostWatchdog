@@ -2,7 +2,7 @@ using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using ClientGhostWatchdog.Configuration;
-using ClientGhostWatchdog.Watchdog;
+using ClientGhostWatchdog.Core.Watchdog;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -18,8 +18,9 @@ namespace ClientGhostWatchdog
         public const string NetworkPerformanceSystemGUID = "MidnightsFX.NetworkPerformanceSystem";
 
         internal static Plugin? Instance { get; private set; }
-        internal static ManualLogSource Log = null!;
+        internal static ManualLogSource Log { get; private set; } = null!;
         private Harmony? _harmony;
+        private DebugHotkeyListener? _debugHotkeyListener;
 
         private void Awake()
         {
@@ -35,6 +36,7 @@ namespace ClientGhostWatchdog
                 return;
             }
 
+            _debugHotkeyListener = gameObject.AddComponent<DebugHotkeyListener>();
             _harmony = new Harmony(ModGUID);
             _harmony.PatchAll();
 
@@ -52,24 +54,19 @@ namespace ClientGhostWatchdog
         private void OnDestroy()
         {
             WatchdogManager.Stop("Plugin.OnDestroy");
-            _harmony?.UnpatchSelf();
-        }
-
-        private void Update()
-        {
-            if (ModConfig.EnableDebugLogs.Value && ModConfig.DebugSimulateSeverKey.Value != KeyCode.None)
+            if (_debugHotkeyListener)
             {
-                if (Input.GetKeyDown(ModConfig.DebugSimulateSeverKey.Value))
-                {
-                    WatchdogManager.SimulateSeveredPeer();
-                }
+                Destroy(_debugHotkeyListener);
+                _debugHotkeyListener = null;
             }
+
+            _harmony?.UnpatchSelf();
+            Instance = null;
         }
 
-        // Conditionally emits detailed debug messages when EnableDebugLogs is true
         internal static void LogDebug(string message)
         {
-            if (ModConfig.EnableDebugLogs.Value)
+            if (ModConfig.Instance.EnableDebugLogs.Value)
             {
                 Log.LogInfo($"[DEBUG] {message}");
             }

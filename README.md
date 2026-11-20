@@ -30,14 +30,14 @@ The client continues running in an empty, desynced world without realizing it wa
 - **No `Game.Update` Overhead**: Runs completely via a dedicated Unity coroutine with real-time sleep intervals, executing zero per-frame checks in `Game.Update`.
 - **Disabled on Local Worlds**: Strictly inactive on singleplayer worlds or local server hosts (`ZNet.instance.IsServer()`). No coroutine is started and no checks run.
 - **Two-Stage Detection**:
-  - **Stage 1 (Halfway Warning)**: When server silence reaches halfway through the configured timeout period (e.g. 15s at the default 30s timeout), a prominent on-screen center notice warns the player: `"Server connection lost, attempting to reconnect... ({0}s)"`. The `{0}` placeholder dynamically updates with the countdown until disconnect.
+  - **Stage 1 (Halfway Warning)**: When server silence reaches half of `TimeoutSeconds` (15s at the default 30s), a center-screen notice warns the player: `"Server connection lost, attempting to reconnect... ({0}s)"`. `{0}` updates with the remaining seconds until disconnect.
   - **Auto-Recovery**: If server communication resumes during the warning stage, the warning is dismissed and an on-screen notice confirms: `"Server connection restored."`
   - **Stage 2 (Timeout & Clean Logout)**: If silence reaches the full timeout, the server socket closes, or the server peer drops, the mod displays `"Server connection lost. Disconnecting..."`, pauses for the configured notice delay (`DisconnectDelaySeconds`, default 5s) so the notice is readable, and triggers `Game.instance.Logout()`. If the game detects the disconnect first, the watchdog defers to it and the player sees the game's own message.
-- **Severed Peer & badly behaved Mod Protection**: Catches scenarios where a third-party mod (such as `ServerCharacters` inventory sync timeout) or network failure drops the server peer without an engine logout, preventing players from being trapped in desync limbo.
-- **Preserves Native Disconnect Reasons**: If an admin kicks or bans a player, or the server shuts down, the watchdog defers to native Valheim, allowing players to see the genuine error dialog instead of generic watchdog notices.
+- **Severed Peer & Third-Party Mod Protection**: Catches scenarios where a third-party mod (such as `ServerCharacters` inventory sync timeout) or network failure drops the server peer without an engine logout, preventing players from being trapped in desync limbo.
+- **Preserves Base Game Disconnect Reasons**: If an admin kicks or bans a player, or the server shuts down, the watchdog defers to the base game so the original error dialog is shown instead of a watchdog notice.
 - **Portal & Teleport Hang Guard**: Resumes health checks after a configurable ceiling (`TeleportTimeoutSeconds`, default 30s) if a player gets stuck in an indefinite portal desync.
 - **Preserves Player Progress**: Calling `Game.instance.Logout()` uses the game's normal logout, which saves the character profile (`SavePlayerProfile(setLogoutPoint: true)`) before returning to the main menu.
-- **Informs the Player**: Displays an informative dialog on the main menu informing the player why they were returned to the menu and that their local save was preserved.
+- **Main Menu Notice**: Displays a dialog on the main menu explaining why the session disconnected and confirming that local character progress was saved.
 - **Stale Dialog Protection**: Disconnect messages expire, so an old message does not appear after a later session.
 
 ---
@@ -45,7 +45,7 @@ The client continues running in an empty, desynced world without realizing it wa
 ## Design Philosophy & Tradeoffs
 
 This mod intentionally enforces a **fail-safe disconnect policy**:
-- **Why fail-safe disconnect?**: In vanilla Valheim, hanging onto an unacknowledged dead connection risks losing valuable building, harvesting, or combat progress. By forcing a clean logout via `Game.instance.Logout()`, the mod saves the player's local inventory and state immediately before the desync worsens.
+- **Why fail-safe disconnect?**: Continuing to play on an undetected dead connection risks losing building, harvesting, or combat progress. Forcing a logout via `Game.instance.Logout()` saves local inventory and character state before further desync occurs.
 - **Handling unstable connections**: If you frequently play on high-latency satellite connections, fluctuating cellular networks, or Wi-Fi prone to multi-second packet drops:
   - Increase `TimeoutSeconds` (e.g. to `60` or `90` seconds) to reduce false alarms from the watchdog. The halfway warning scales accordingly (30s warning for a 60s timeout). This setting controls the watchdog only. The game can still disconnect on its own at about 30 seconds, or 90 seconds on crossplay, and raising this setting does not extend that limit.
   - You can also set `TimeoutSeconds` to `0` to completely disable the watchdog without removing the mod.
@@ -60,15 +60,15 @@ The configuration file is automatically generated at `BepInEx/config/dreamwraith
 |---|---|---|---|---|
 | `1 - General` | `TimeoutSeconds` | `float` | `30` | Total seconds of server silence before disconnecting. Halfway through (e.g. 15s), a warning notice is displayed. Range: `0` to `300`. Set to `0` to disable the watchdog. Controls the watchdog only, the game can still disconnect on its own at about 30 seconds, or 90 seconds on crossplay. |
 | `1 - General` | `CheckIntervalSeconds` | `float` | `1.0` | Interval in seconds between watchdog checks in the background coroutine. Range: `1.0` to `5.0`. |
-| `1 - General` | `TeleportTimeoutSeconds` | `float` | `30` | Maximum seconds a player can remain in a teleporting state before watchdog health checks resume. Prevents infinite limbo if a portal hangs. Range: `0` to `180`. Set to `0` to disable ceiling. |
+| `1 - General` | `TeleportTimeoutSeconds` | `float` | `30` | Maximum seconds a player can remain in a teleporting state before watchdog health checks resume. Prevents permanent stalls if a portal hangs. Range: `0` to `180`. Set to `0` to disable the limit. |
 | `2 - On-Screen Notices` | `WarningNoticeMessage` | `string` | `"Server connection lost, attempting to reconnect... ({0}s)"` | Large on-screen center notice displayed at the halfway mark. `{0}` is replaced with remaining seconds. |
 | `2 - On-Screen Notices` | `RecoveredNoticeMessage` | `string` | `"Server connection restored."` | Large on-screen center notice displayed if connection recovers before timeout. |
-| `2 - On-Screen Notices` | `DisconnectNoticeMessage` | `string` | `"Server connection lost. Disconnecting..."` | Large on-screen center notice displayed when timeout is reached. |
-| `2 - On-Screen Notices` | `DisconnectDelaySeconds` | `float` | `5.0` | Seconds to wait after displaying the disconnect notice before executing logout, giving players time to read the notice. Range: `0` to `30`. Set to `0` for instantaneous logout. |
+| `2 - On-Screen Notices` | `DisconnectNoticeMessage` | `string` | `"Server connection lost. Disconnecting..."` | Large on-screen center notice displayed when the watchdog disconnects the player after a timeout, closed socket, or lost server peer. |
+| `2 - On-Screen Notices` | `DisconnectDelaySeconds` | `float` | `5.0` | Seconds to wait after displaying the disconnect notice before logging out. Range: `0` to `30`. Set to `0` for immediate logout. |
 | `3 - Main Menu Dialog` | `ShowDisconnectReason` | `bool` | `true` | Whether to display an explanatory message on the main menu after being disconnected by this watchdog. |
 | `3 - Main Menu Dialog` | `DisconnectMessage` | `string` | `"Server connection lost (Ghost connection prevented). Progress was saved."` | Custom message displayed on the main menu dialog when disconnected. |
 | `4 - Debug` | `EnableDebugLogs` | `bool` | `false` | When enabled, prints detailed debug logs with every watchdog check tick, timer event, threshold evaluation, and connection lifecycle hook. |
-| `4 - Debug` | `DebugSimulateSeverKey` | `KeyCode` | `None` | DEBUG ONLY: Keybind to simulate an abrupt peer disconnection (ServerCharacters behavior). Requires EnableDebugLogs to be true. Keep as None for normal play. The `cgw_simulatesever` console command does the same thing and also needs `EnableDebugLogs`. |
+| `4 - Debug` | `DebugSimulateSeverKey` | `KeyCode` | `None` | Debug keybind that simulates an abrupt peer disconnect (ServerCharacters behavior). Requires `EnableDebugLogs` to be true. Leave as `None` for normal play. The `cgw_simulatesever` console command does the same thing and also needs `EnableDebugLogs`. |
 
 ---
 
@@ -116,6 +116,7 @@ You can also find and message DreamWraith on these Valheim Discord servers:
 
 - [**WispTorchHeeler**](https://thunderstore.io/c/valheim/p/DreamWraith/WispTorchHeeler/): Tiered Mistlands wisp torches and lamps with expanded mist clearance, torch painting, and Wisplight customization.
 - [**PersonalChestHeeler**](https://thunderstore.io/c/valheim/p/DreamWraith/PersonalChestHeeler/): Tiered personal locked storage chests with server-synced capacity and crafting recipes.
+- [**PlantBiomeHeeler**](https://thunderstore.io/c/valheim/p/DreamWraith/PlantBiomeHeeler/): Terrain overlay and HUD that show which biome a crop or sapling actually gets, with two-tone borders and optional hatch lines.
 
 ### HUD
 

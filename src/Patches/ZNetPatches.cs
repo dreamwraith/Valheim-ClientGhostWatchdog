@@ -1,33 +1,22 @@
 using HarmonyLib;
-using ClientGhostWatchdog.Watchdog;
+using ClientGhostWatchdog.Core.Watchdog;
 
 namespace ClientGhostWatchdog.Patches
 {
-    // Start watchdog once the client successfully completes peer handshake with dedicated server
-    [HarmonyPatch(typeof(ZNet), nameof(ZNet.RPC_PeerInfo))]
-    public static class ZNet_RPC_PeerInfo_Patch
+    [HarmonyPatch(typeof(ZNet))]
+    internal static class ZNetPatches
     {
         [HarmonyPostfix]
-        public static void Postfix(ZNet __instance)
+        [HarmonyPatch(nameof(ZNet.RPC_PeerInfo))]
+        private static void RpcPeerInfoPostfix()
         {
             Plugin.LogDebug("ZNet.RPC_PeerInfo postfix triggered.");
-
-            if (__instance.IsServer())
-            {
-                Plugin.LogDebug("ZNet.RPC_PeerInfo: Host is server; ignoring watchdog start.");
-                return;
-            }
-
             WatchdogManager.Start("ZNet.RPC_PeerInfo");
         }
-    }
 
-    // Stop watchdog on network shutdown
-    [HarmonyPatch(typeof(ZNet), nameof(ZNet.Shutdown))]
-    public static class ZNet_Shutdown_Patch
-    {
         [HarmonyPostfix]
-        public static void Postfix()
+        [HarmonyPatch(nameof(ZNet.Shutdown))]
+        private static void ShutdownPostfix()
         {
             Plugin.LogDebug("ZNet.Shutdown postfix triggered.");
             WatchdogManager.Stop("ZNet.Shutdown");

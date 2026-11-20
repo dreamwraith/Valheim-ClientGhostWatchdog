@@ -1,17 +1,14 @@
 using System.Collections;
 using UnityEngine;
 
-namespace ClientGhostWatchdog.Watchdog
+namespace ClientGhostWatchdog.Core.Watchdog
 {
-    /// <summary>
-    /// Preserves and displays custom disconnect explanations across scene transitions (world unload to main menu).
-    /// </summary>
     internal static class DisconnectReasonManager
     {
         private static string? s_pendingReason;
         private static float s_reasonTimestamp = 0f;
 
-        // 300s TTL accommodates long save times and scene load durations while preventing stale dialogs later
+        // 300s ttl covers slow saves and scene loads without showing stale dialogs later
         private const float ReasonTtlSeconds = 300f;
 
         public static string? PendingReason
@@ -31,7 +28,6 @@ namespace ClientGhostWatchdog.Watchdog
             }
         }
 
-        // Stores custom disconnect reason and records timestamp
         public static void SetReason(string reason)
         {
             s_pendingReason = reason;
@@ -39,7 +35,6 @@ namespace ClientGhostWatchdog.Watchdog
             Plugin.LogDebug($"DisconnectReasonManager: Registered pending reason (TTL={ReasonTtlSeconds}s): \"{reason}\"");
         }
 
-        // Clears stored reason
         public static void Clear()
         {
             s_pendingReason = null;
@@ -47,7 +42,16 @@ namespace ClientGhostWatchdog.Watchdog
             Plugin.LogDebug("DisconnectReasonManager: Cleared pending reason.");
         }
 
-        // Applies pending disconnect reason to FejdStartup and reinforces on next frame
+        public static void HandleDialogAcknowledged(FejdStartup startup)
+        {
+            if (startup.m_connectionFailedError.TryGetComponent(out Localize localize))
+            {
+                localize.enabled = true;
+            }
+
+            Clear();
+        }
+
         public static void ApplyToMenu(FejdStartup startup)
         {
             string? reason = PendingReason;
@@ -60,35 +64,25 @@ namespace ClientGhostWatchdog.Watchdog
 
         private static void ApplyTextAndShowPanel(FejdStartup startup, string reason)
         {
-            if (startup.m_connectionFailedPanel)
+            startup.m_connectionFailedPanel.SetActive(true);
+
+            // turn off Localize so the base game doesnt overwrite the custom text
+            if (startup.m_connectionFailedError.TryGetComponent(out Localize localize))
             {
-                startup.m_connectionFailedPanel.SetActive(true);
+                localize.enabled = false;
             }
 
-            if (startup.m_connectionFailedError)
-            {
-                // Disable Localize component to prevent native from overwriting custom text with generic "Disconnected"
-                var localize = startup.m_connectionFailedError.GetComponent("Localize") as Behaviour;
-                if (localize)
-                {
-                    localize.enabled = false;
-                }
-
-                startup.m_connectionFailedError.text = reason;
-                Plugin.LogDebug($"DisconnectReasonManager: Applied disconnect reason to FejdStartup: \"{reason}\"");
-            }
+            startup.m_connectionFailedError.text = reason;
+            Plugin.LogDebug($"DisconnectReasonManager: Applied disconnect reason to FejdStartup: \"{reason}\"");
         }
 
-        // Re-applies text on next frame in case UI animators or layout rebuilds reset text initially
+        // reapply on the next frame in case ui animators or layout rebuilds reset the text
         private static IEnumerator ReinforceNoticeRoutine(FejdStartup startup, string reason)
         {
             yield return null;
 
-            if (startup != null && startup.m_connectionFailedError != null)
-            {
-                ApplyTextAndShowPanel(startup, reason);
-                Plugin.LogDebug("DisconnectReasonManager: Reinforced disconnect reason on next frame.");
-            }
+            ApplyTextAndShowPanel(startup, reason);
+            Plugin.LogDebug("DisconnectReasonManager: Reinforced disconnect reason on next frame.");
         }
     }
 }
